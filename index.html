@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a0a0a">
+<title>Call Cockpit</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%231d9e75'/%3E%3Cpath d='M30 35 Q30 30 35 30 L42 30 L48 42 L42 48 Q48 58 60 64 L66 58 L78 64 L78 71 Q78 76 73 76 Q48 76 30 58 Q30 45 30 35 Z' fill='white'/%3E%3C/svg%3E">
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0a0a0a; color: #f5f5f5; overscroll-behavior: none; }
+  body { padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+  button { font-family: inherit; cursor: pointer; border: none; }
+  .app { height: 100vh; height: 100dvh; display: flex; flex-direction: column; max-width: 600px; margin: 0 auto; position: relative; }
+  .screen { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+  .hidden { display: none !important; }
+
+  /* List screen */
+  .header { padding: 18px 20px 12px; border-bottom: 0.5px solid #2a2a2a; }
+  .header-row { display: flex; justify-content: space-between; align-items: baseline; }
+  .eyebrow { font-size: 12px; color: #888; letter-spacing: 0.5px; text-transform: uppercase; margin: 0 0 4px; font-weight: 500; }
+  .title { font-size: 26px; font-weight: 600; margin: 0; color: #fff; }
+  .meta { font-size: 14px; color: #888; margin: 6px 0 0; }
+  .progress { height: 4px; background: #2a2a2a; border-radius: 2px; margin-top: 14px; overflow: hidden; }
+  .progress-fill { height: 100%; background: #1d9e75; transition: width 0.4s; }
+  .actions-bar { display: flex; gap: 8px; padding: 12px 16px 0; }
+  .pill { background: #1a1a1a; border: 0.5px solid #2a2a2a; color: #ccc; padding: 8px 14px; border-radius: 18px; font-size: 13px; font-weight: 500; }
+  .pill:active { background: #2a2a2a; }
+  .list { flex: 1; overflow-y: auto; padding: 12px 12px 120px; -webkit-overflow-scrolling: touch; }
+  .card { background: #161616; border-radius: 18px; border: 0.5px solid #2a2a2a; padding: 16px 14px; display: flex; align-items: center; gap: 14px; margin-bottom: 10px; min-height: 92px; transition: transform 0.15s; }
+  .card:active { transform: scale(0.985); }
+  .card.active { border: 2px solid #1d9e75; padding: 15px 13px; }
+  .card.done { opacity: 0.45; }
+  .avatar { width: 58px; height: 58px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 19px; font-weight: 600; flex-shrink: 0; }
+  .avatar.c1 { background: #1a3a2e; color: #5dcaa5; }
+  .avatar.c2 { background: #2a2148; color: #afa9ec; }
+  .avatar.c3 { background: #3a1f12; color: #f0997b; }
+  .avatar.c4 { background: #3a2f0c; color: #fac775; }
+  .avatar.c5 { background: #0c2944; color: #85b7eb; }
+  .avatar.c6 { background: #3a1828; color: #ed93b1; }
+  .body { flex: 1; min-width: 0; }
+  .name { font-size: 17px; font-weight: 600; margin: 0 0 2px; color: #fff; }
+  .role { font-size: 13px; color: #888; margin: 0 0 6px; line-height: 1.3; }
+  .tag { display: inline-block; font-size: 11px; padding: 3px 9px; border-radius: 10px; font-weight: 600; }
+  .tag.hot { background: #3a1414; color: #f09595; }
+  .tag.warm { background: #3a2f0c; color: #fac775; }
+  .tag.cold { background: #0c2944; color: #85b7eb; }
+  .tag.followup { background: #2a2148; color: #afa9ec; }
+  .tag.done { background: #1a3a2e; color: #5dcaa5; }
+  .status-icon { font-size: 24px; width: 32px; text-align: center; color: #555; flex-shrink: 0; }
+  .status-icon.done { color: #1d9e75; }
+  .status-icon.active { color: #1d9e75; }
+  .bottom-bar { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(10,10,10,0.95); backdrop-filter: blur(12px); border-top: 0.5px solid #2a2a2a; padding: 14px 16px calc(20px + env(safe-area-inset-bottom)); display: flex; gap: 10px; }
+  .btn-nav { flex: 1; height: 52px; border-radius: 26px; font-size: 15px; font-weight: 600; }
+  .btn-nav.secondary { background: #2a2a2a; color: #fff; }
+  .btn-nav.primary { background: #1d9e75; color: #fff; }
+  .btn-nav:disabled { opacity: 0.4; }
+  .btn-nav:active { opacity: 0.8; }
+
+  /* Briefing modal */
+  .overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; padding: 24px; z-index: 50; }
+  .briefing { background: #1a1a1a; border-radius: 24px; padding: 28px 22px 22px; width: 100%; max-width: 360px; border: 0.5px solid #2a2a2a; }
+  .briefing-eyebrow { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #5dcaa5; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; margin: 0 0 16px; }
+  .briefing-eyebrow .dot { width: 8px; height: 8px; background: #1d9e75; border-radius: 50%; animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
+  .briefing-avatar-row { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+  .briefing-text { font-size: 16px; line-height: 1.55; color: #f0f0f0; margin: 0 0 20px; min-height: 80px; }
+  .voice-bars { display: flex; align-items: center; justify-content: center; gap: 3px; height: 36px; margin: 0 0 18px; }
+  .vb { width: 3px; background: #1d9e75; border-radius: 2px; animation: bar 0.9s ease-in-out infinite; }
+  @keyframes bar { 0%, 100% { height: 6px; } 50% { height: 28px; } }
+  .btn-call { width: 100%; height: 56px; background: #1d9e75; color: #fff; border-radius: 28px; font-size: 16px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 10px; }
+  .btn-call:active { background: #168561; }
+  .btn-skip { width: 100%; height: 44px; background: transparent; color: #888; font-size: 14px; margin-top: 8px; }
+
+  /* Memo screen */
+  .memo { padding: 32px 22px 24px; flex: 1; display: flex; flex-direction: column; }
+  .memo-title { font-size: 26px; font-weight: 600; margin: 4px 0; color: #fff; }
+  .memo-sub { font-size: 14px; color: #888; margin: 0 0 24px; }
+  .memo-mic-wrap { display: flex; flex-direction: column; align-items: center; padding: 20px 0; }
+  .mic-btn { width: 120px; height: 120px; border-radius: 50%; background: #3a1414; border: 3px solid #e24b4a; color: #f09595; font-size: 48px; display: flex; align-items: center; justify-content: center; animation: micpulse 1.6s ease-in-out infinite; }
+  .mic-btn.idle { background: #1a1a1a; border-color: #2a2a2a; color: #888; animation: none; }
+  @keyframes micpulse { 0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(226,75,74,0.4); } 50% { transform: scale(1.04); box-shadow: 0 0 0 12px rgba(226,75,74,0); } }
+  .timer { font-size: 32px; font-weight: 600; font-variant-numeric: tabular-nums; margin: 16px 0 6px; color: #fff; }
+  .memo-hint { font-size: 13px; color: #888; margin: 0; }
+  .transcript-box { background: #161616; border: 0.5px solid #2a2a2a; border-radius: 16px; padding: 16px; font-size: 15px; line-height: 1.5; color: #e5e5e5; margin: 20px 0 16px; min-height: 100px; max-height: 240px; overflow-y: auto; }
+  .transcript-box.empty { color: #555; font-style: italic; }
+  .memo-actions { margin-top: auto; display: flex; flex-direction: column; gap: 10px; }
+  .btn-primary { background: #1d9e75; color: #fff; height: 56px; border-radius: 28px; font-size: 16px; font-weight: 600; }
+  .btn-primary:active { background: #168561; }
+  .btn-secondary { background: #2a2a2a; color: #fff; height: 52px; border-radius: 26px; font-size: 15px; font-weight: 500; }
+  .btn-ghost { background: transparent; color: #888; height: 44px; font-size: 14px; }
+
+  /* Memos outbox */
+  .outbox { padding: 24px 22px; flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .outbox-list { flex: 1; overflow-y: auto; margin: 16px -22px; padding: 0 22px; }
+  .memo-item { background: #161616; border: 0.5px solid #2a2a2a; border-radius: 14px; padding: 14px; margin-bottom: 10px; }
+  .memo-item-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .memo-item-name { font-size: 15px; font-weight: 600; color: #fff; }
+  .memo-item-time { font-size: 12px; color: #888; }
+  .memo-item-text { font-size: 14px; color: #ccc; line-height: 1.45; margin: 0; white-space: pre-wrap; }
+
+  /* Empty state */
+  .empty-state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 24px; text-align: center; }
+  .empty-icon { font-size: 56px; margin-bottom: 16px; opacity: 0.4; }
+  .empty-title { font-size: 20px; font-weight: 600; color: #fff; margin: 0 0 8px; }
+  .empty-text { font-size: 14px; color: #888; margin: 0 0 24px; max-width: 280px; line-height: 1.5; }
+  .empty-text code { background: #1a1a1a; color: #ccc; padding: 2px 6px; border-radius: 4px; font-size: 12px; font-family: ui-monospace, Menlo, monospace; }
+  .paste-box { width: 100%; min-height: 120px; background: #161616; border: 0.5px solid #2a2a2a; border-radius: 14px; padding: 14px; color: #fff; font-family: ui-monospace, Menlo, monospace; font-size: 13px; margin-bottom: 12px; resize: none; }
+
+  /* Top nav */
+  .topnav { display: flex; gap: 4px; padding: 0 16px 0; border-bottom: 0.5px solid #2a2a2a; }
+  .topnav-btn { flex: 1; background: transparent; color: #888; padding: 12px 8px; font-size: 13px; font-weight: 500; border-bottom: 2px solid transparent; }
+  .topnav-btn.active { color: #fff; border-bottom-color: #1d9e75; }
+  .badge { display: inline-block; background: #1d9e75; color: #fff; font-size: 11px; padding: 1px 7px; border-radius: 10px; margin-left: 6px; font-weight: 600; }
+
+  /* Toast */
+  .toast { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); background: #1d9e75; color: #fff; padding: 12px 20px; border-radius: 22px; font-size: 14px; font-weight: 500; z-index: 100; animation: toastIn 0.3s; }
+  @keyframes toastIn { from { opacity: 0; transform: translate(-50%, -10px); } to { opacity: 1; transform: translate(-50%, 0); } }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Top nav -->
+  <div class="topnav" id="topnav">
+    <button class="topnav-btn active" data-tab="list">Bellen</button>
+    <button class="topnav-btn" data-tab="outbox">Memos <span class="badge hidden" id="memo-badge">0</span></button>
+  </div>
+
+  <!-- List screen -->
+  <div class="screen" id="screen-list">
+    <div class="header">
+      <p class="eyebrow" id="eyebrow">Vandaag · v2</p>
+      <div class="header-row">
+        <h1 class="title">Belrondje</h1>
+      </div>
+      <p class="meta" id="meta">0 van 0 gedaan</p>
+      <div class="progress"><div class="progress-fill" id="progress" style="width: 0%"></div></div>
+    </div>
+    <div class="list" id="list"></div>
+    <div class="bottom-bar">
+      <button class="btn-nav secondary" id="btn-load">Laad lijst</button>
+      <button class="btn-nav primary" id="btn-start">Start volgende</button>
+    </div>
+    <input type="file" id="file-picker" accept=".json,application/json" style="display: none;">
+  </div>
+
+  <!-- Outbox screen -->
+  <div class="screen hidden" id="screen-outbox">
+    <div class="outbox">
+      <p class="eyebrow">Vandaag</p>
+      <h1 class="title" style="margin: 2px 0 0;">Memos voor Claude</h1>
+      <p class="meta" id="outbox-meta">Nog geen memos</p>
+
+      <div class="outbox-list" id="outbox-list"></div>
+
+      <div class="memo-actions">
+        <button class="btn-primary" id="btn-share">Stuur memos naar Claude</button>
+        <button class="btn-secondary" id="btn-copy">Kopieer naar klembord</button>
+        <button class="btn-ghost" id="btn-clear">Wis alle memos</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Briefing overlay -->
+  <div class="overlay hidden" id="overlay-briefing">
+    <div class="briefing">
+      <p class="briefing-eyebrow"><span class="dot"></span> Briefing</p>
+      <div class="briefing-avatar-row">
+        <div class="avatar" id="b-avatar"></div>
+        <div>
+          <p class="name" id="b-name"></p>
+          <p class="role" id="b-role"></p>
+        </div>
+      </div>
+      <p class="briefing-text" id="b-text"></p>
+      <div class="voice-bars" id="b-bars"></div>
+      <button class="btn-call" id="b-call">Bel nu</button>
+      <button class="btn-skip" id="b-skip">Overslaan</button>
+    </div>
+  </div>
+
+  <!-- Memo screen -->
+  <div class="screen hidden" id="screen-memo">
+    <div class="memo">
+      <p class="eyebrow" id="m-eyebrow">Na gesprek met</p>
+      <h1 class="memo-title" id="m-title">Wat is besproken?</h1>
+      <p class="memo-sub">Spreek vrijuit. Tik op stoppen als je klaar bent.</p>
+
+      <div class="memo-mic-wrap">
+        <button class="mic-btn" id="mic-btn">●</button>
+        <p class="timer" id="m-timer">0:00</p>
+        <p class="memo-hint" id="m-hint">Aan het luisteren…</p>
+      </div>
+
+      <div class="transcript-box empty" id="transcript">Spraak verschijnt hier…</div>
+
+      <div class="memo-actions">
+        <button class="btn-primary" id="m-save">Opslaan en volgende</button>
+        <button class="btn-secondary" id="m-back">Terug naar lijst</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ============ DATA ============
+// Contactenlijst wordt geladen vanuit een JSON bestand dat jij selecteert.
+// Standaard pad: Internal storage > Download > Cockpit > contacts.json
+let CONTACTS = [];
+let LIST_META = { date: "", source: "" };
+
+// ============ STATE ============
+const LS_KEY = "cockpit_state_v1";
+let state = loadState();
+
+function loadState() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(LS_KEY) || "{}");
+    return {
+      completed: saved.completed || [],
+      memos: saved.memos || [],
+      date: saved.date || new Date().toISOString().split("T")[0],
+      contacts: saved.contacts || [],
+      listDate: saved.listDate || "",
+      listSource: saved.listSource || ""
+    };
+  } catch { return { completed: [], memos: [], date: new Date().toISOString().split("T")[0], contacts: [], listDate: "", listSource: "" }; }
+}
+
+function saveState() { localStorage.setItem(LS_KEY, JSON.stringify(state)); }
+
+// Reset day-state (completed, memos) if it's a new day, but keep the cached list
+const today = new Date().toISOString().split("T")[0];
+if (state.date !== today) {
+  state.completed = [];
+  state.memos = [];
+  state.date = today;
+  saveState();
+}
+
+// Load cached contacts into runtime
+CONTACTS = state.contacts || [];
+LIST_META = { date: state.listDate, source: state.listSource };
+
+let currentContact = null;
+let mediaRecorder = null;
+let audioChunks = [];
+let recognition = null;
+let memoStartTime = 0;
+let memoTimer = null;
+let liveTranscript = "";
+
+// ============ RENDER ============
+function $(id) { return document.getElementById(id); }
+
+function renderList() {
+  const total = CONTACTS.length;
+  const done = state.completed.length;
+  const pending = CONTACTS.filter(c => !state.completed.includes(c.id));
+  const nextContact = pending[0];
+
+  const dateStr = new Date().toLocaleDateString("nl-NL", { weekday: "long", day: "numeric", month: "long" });
+  $("eyebrow").textContent = dateStr;
+
+  const listEl = $("list");
+
+  if (total === 0) {
+    $("meta").textContent = "Nog geen lijst geladen";
+    $("progress").style.width = "0%";
+    listEl.innerHTML = '<div class="empty-state">'
+      + '<div class="empty-icon">📋</div>'
+      + '<p class="empty-title">Geen lijst voor vandaag</p>'
+      + '<p class="empty-text">Vraag Claude om een belrondje te bouwen, download het JSON bestand naar <code>Download/Cockpit/</code>, en tik op "Laad lijst" hieronder.</p>'
+      + '<button class="btn-primary" id="btn-load-big" style="margin-top: 16px; min-width: 200px;">Laad lijst</button>'
+      + '</div>';
+    const bigBtn = $("btn-load-big");
+    if (bigBtn) bigBtn.onclick = () => $("file-picker").click();
+    $("btn-start").disabled = true;
+    $("btn-start").textContent = "Geen lijst";
+    updateMemoBadge();
+    return;
+  }
+
+  const sourceLabel = LIST_META.source ? " · " + LIST_META.source : "";
+  $("meta").textContent = done + " van " + total + " gebeld" + sourceLabel;
+  $("progress").style.width = (total ? Math.round(done / total * 100) : 0) + "%";
+
+  listEl.innerHTML = CONTACTS.map(c => {
+    const isDone = state.completed.includes(c.id);
+    const isActive = !isDone && c.id === (nextContact && nextContact.id);
+    const cardClass = "card" + (isActive ? " active" : "") + (isDone ? " done" : "");
+    const tagHtml = isDone
+      ? '<span class="tag done">Gedaan</span>'
+      : '<span class="tag ' + (c.tag || "warm") + '">' + (c.tagLabel || "Warm") + '</span>';
+    const iconHtml = isDone ? '✓' : isActive ? '▶' : '›';
+    const iconClass = "status-icon" + (isDone ? " done" : isActive ? " active" : "");
+    return '<div class="' + cardClass + '" data-id="' + c.id + '">'
+      + '<div class="avatar ' + (c.avatar || "c1") + '">' + (c.initials || "?") + '</div>'
+      + '<div class="body">'
+      +   '<p class="name">' + c.name + '</p>'
+      +   '<p class="role">' + (c.role || "") + '</p>'
+      +   tagHtml
+      + '</div>'
+      + '<div class="' + iconClass + '">' + iconHtml + '</div>'
+      + '</div>';
+  }).join("");
+
+  // Attach card click handlers
+  listEl.querySelectorAll(".card").forEach(card => {
+    card.onclick = () => {
+      const id = parseInt(card.dataset.id);
+      if (state.completed.includes(id)) return;
+      const c = CONTACTS.find(x => x.id === id);
+      openBriefing(c);
+    };
+  });
+
+  // Update start button
+  $("btn-start").disabled = !nextContact;
+  $("btn-start").textContent = nextContact ? "Start volgende" : "Klaar voor vandaag";
+
+  // Update memo badge
+  updateMemoBadge();
+}
+
+function updateMemoBadge() {
+  const badge = $("memo-badge");
+  if (state.memos.length > 0) {
+    badge.textContent = state.memos.length;
+    badge.classList.remove("hidden");
+  } else {
+    badge.classList.add("hidden");
+  }
+}
+
+// ============ BRIEFING ============
+function openBriefing(contact) {
+  currentContact = contact;
+  $("b-name").textContent = contact.name;
+  $("b-role").textContent = contact.role;
+  $("b-avatar").className = "avatar " + contact.avatar;
+  $("b-avatar").textContent = contact.initials;
+  $("b-text").textContent = contact.briefing;
+
+  // Generate voice bars
+  const bars = $("b-bars");
+  bars.innerHTML = Array.from({length: 24}, (_, i) =>
+    '<div class="vb" style="animation-delay: ' + (i * 0.05) + 's"></div>'
+  ).join("");
+
+  $("overlay-briefing").classList.remove("hidden");
+
+  // Speak the briefing using browser TTS
+  speakBriefing(contact.briefing);
+}
+
+function speakBriefing(text) {
+  if (!window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.lang = "nl-NL";
+  utter.rate = 1.05;
+  utter.pitch = 1.0;
+  // Try to pick a Dutch voice if available
+  const voices = window.speechSynthesis.getVoices();
+  const nl = voices.find(v => v.lang.startsWith("nl"));
+  if (nl) utter.voice = nl;
+  window.speechSynthesis.speak(utter);
+}
+
+function closeBriefing() {
+  $("overlay-briefing").classList.add("hidden");
+  if (window.speechSynthesis) window.speechSynthesis.cancel();
+}
+
+// ============ CALL ============
+function placeCall(contact) {
+  closeBriefing();
+  // Open the native dialer via tel: link
+  // On Android this opens the phone app with the number pre-filled
+  window.location.href = "tel:" + contact.phone.replace(/[^\d+]/g, "");
+
+  // After a short delay, show the memo screen
+  // The user will be in the phone app; when they come back, memo screen is ready
+  setTimeout(() => {
+    showMemoScreen(contact);
+  }, 800);
+}
+
+// ============ MEMO ============
+function showMemoScreen(contact) {
+  currentContact = contact;
+  $("screen-list").classList.add("hidden");
+  $("screen-outbox").classList.add("hidden");
+  $("screen-memo").classList.remove("hidden");
+  $("m-eyebrow").textContent = "Na gesprek met " + contact.name;
+  $("m-title").textContent = "Wat is besproken?";
+  $("transcript").textContent = "Spraak verschijnt hier…";
+  $("transcript").classList.add("empty");
+  $("m-timer").textContent = "0:00";
+  $("m-hint").textContent = "Tik op de microfoon om te starten";
+  $("mic-btn").classList.add("idle");
+  liveTranscript = "";
+
+  // Auto-start recording after a brief moment
+  setTimeout(startMemo, 500);
+}
+
+function startMemo() {
+  $("mic-btn").classList.remove("idle");
+  $("m-hint").textContent = "Aan het luisteren…";
+  memoStartTime = Date.now();
+
+  if (memoTimer) clearInterval(memoTimer);
+  memoTimer = setInterval(() => {
+    const sec = Math.floor((Date.now() - memoStartTime) / 1000);
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    $("m-timer").textContent = m + ":" + String(s).padStart(2, "0");
+  }, 250);
+
+  // Use Web Speech API for live transcription
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    $("transcript").textContent = "Spraakherkenning niet beschikbaar in deze browser. Tik op opslaan en typ later.";
+    $("transcript").classList.remove("empty");
+    return;
+  }
+
+  recognition = new SR();
+  recognition.lang = "nl-NL";
+  recognition.continuous = true;
+  recognition.interimResults = true;
+
+  let finalText = "";
+  recognition.onresult = (e) => {
+    let interim = "";
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      if (e.results[i].isFinal) {
+        finalText += e.results[i][0].transcript + " ";
+      } else {
+        interim += e.results[i][0].transcript;
+      }
+    }
+    liveTranscript = finalText;
+    const display = finalText + (interim ? " " + interim : "");
+    if (display.trim()) {
+      $("transcript").textContent = display;
+      $("transcript").classList.remove("empty");
+    }
+  };
+
+  recognition.onerror = (e) => {
+    console.log("Recognition error:", e.error);
+    if (e.error === "no-speech") {
+      // Restart silently
+      try { recognition.start(); } catch {}
+    }
+  };
+
+  recognition.onend = () => {
+    // Restart if still recording (continuous mode sometimes drops)
+    if ($("mic-btn") && !$("mic-btn").classList.contains("idle")) {
+      try { recognition.start(); } catch {}
+    }
+  };
+
+  try {
+    recognition.start();
+  } catch (e) {
+    console.log("Could not start recognition:", e);
+  }
+}
+
+function stopMemo() {
+  if (recognition) {
+    try { recognition.stop(); } catch {}
+    recognition = null;
+  }
+  if (memoTimer) {
+    clearInterval(memoTimer);
+    memoTimer = null;
+  }
+  $("mic-btn").classList.add("idle");
+  $("m-hint").textContent = "Opgenomen. Tik om door te gaan.";
+}
+
+function saveMemo() {
+  stopMemo();
+  const text = liveTranscript.trim() || $("transcript").textContent.trim();
+  if (text && text !== "Spraak verschijnt hier…") {
+    state.memos.push({
+      contactId: currentContact.id,
+      contactName: currentContact.name,
+      contactPhone: currentContact.phone,
+      timestamp: new Date().toISOString(),
+      text: text
+    });
+  }
+  if (!state.completed.includes(currentContact.id)) {
+    state.completed.push(currentContact.id);
+  }
+  saveState();
+
+  // Go to next contact, or back to list
+  const next = CONTACTS.find(c => !state.completed.includes(c.id));
+  $("screen-memo").classList.add("hidden");
+  $("screen-list").classList.remove("hidden");
+  renderList();
+
+  if (next) {
+    showToast("Memo opgeslagen. Volgende: " + next.name);
+    setTimeout(() => openBriefing(next), 1200);
+  } else {
+    showToast("Alle calls gedaan voor vandaag");
+  }
+}
+
+function backToList() {
+  stopMemo();
+  if (!state.completed.includes(currentContact.id)) {
+    state.completed.push(currentContact.id);
+  }
+  // Still save the memo if there is one
+  const text = liveTranscript.trim();
+  if (text) {
+    state.memos.push({
+      contactId: currentContact.id,
+      contactName: currentContact.name,
+      contactPhone: currentContact.phone,
+      timestamp: new Date().toISOString(),
+      text: text
+    });
+  }
+  saveState();
+  $("screen-memo").classList.add("hidden");
+  $("screen-list").classList.remove("hidden");
+  renderList();
+}
+
+// ============ OUTBOX ============
+function renderOutbox() {
+  const listEl = $("outbox-list");
+  const meta = $("outbox-meta");
+
+  if (state.memos.length === 0) {
+    meta.textContent = "Nog geen memos opgenomen vandaag";
+    listEl.innerHTML = '<div class="empty-state"><div class="empty-icon">🎙</div><p class="empty-text">Memos die je na elke call opneemt verschijnen hier. Stuur ze in één keer naar Claude om in HubSpot te zetten.</p></div>';
+    $("btn-share").disabled = true;
+    $("btn-copy").disabled = true;
+    $("btn-share").style.opacity = "0.4";
+    $("btn-copy").style.opacity = "0.4";
+    return;
+  }
+
+  meta.textContent = state.memos.length + " memo" + (state.memos.length > 1 ? "s" : "") + " klaar";
+  $("btn-share").disabled = false;
+  $("btn-copy").disabled = false;
+  $("btn-share").style.opacity = "1";
+  $("btn-copy").style.opacity = "1";
+
+  listEl.innerHTML = state.memos.map((m, i) => {
+    const time = new Date(m.timestamp).toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" });
+    return '<div class="memo-item">'
+      + '<div class="memo-item-head">'
+      +   '<span class="memo-item-name">' + m.contactName + '</span>'
+      +   '<span class="memo-item-time">' + time + '</span>'
+      + '</div>'
+      + '<p class="memo-item-text">' + m.text + '</p>'
+      + '</div>';
+  }).join("");
+}
+
+function buildMemoText() {
+  const dateStr = new Date().toLocaleDateString("nl-NL", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  let out = "Call memos — " + dateStr + "\n\n";
+  out += "Hoi Claude, hieronder de memos van mijn belrondje vandaag. Zet de relevante info in HubSpot per contact, op de bestaande conventies (E.164, domain matching, eigenaar routing).\n\n";
+  state.memos.forEach((m, i) => {
+    const time = new Date(m.timestamp).toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" });
+    out += "---\n";
+    out += (i + 1) + ". " + m.contactName + " (" + m.contactPhone + ") — " + time + "\n";
+    out += m.text + "\n\n";
+  });
+  return out;
+}
+
+async function shareMemos() {
+  const text = buildMemoText();
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: "Call memos", text: text });
+    } catch (e) {
+      // User cancelled or share failed — fall back to copy
+      copyMemos();
+    }
+  } else {
+    copyMemos();
+  }
+}
+
+async function copyMemos() {
+  const text = buildMemoText();
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast("Memos gekopieerd. Plak in Claude chat.");
+  } catch (e) {
+    // Fallback: select textarea
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    document.body.removeChild(ta);
+    showToast("Memos gekopieerd. Plak in Claude chat.");
+  }
+}
+
+function clearMemos() {
+  if (confirm("Alle memos wissen? Dit kan niet ongedaan worden gemaakt.")) {
+    state.memos = [];
+    saveState();
+    renderOutbox();
+    updateMemoBadge();
+  }
+}
+
+// ============ TOAST ============
+function showToast(msg) {
+  const existing = document.querySelector(".toast");
+  if (existing) existing.remove();
+  const t = document.createElement("div");
+  t.className = "toast";
+  t.textContent = msg;
+  document.querySelector(".app").appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+
+// ============ NAVIGATION ============
+function showTab(tab) {
+  document.querySelectorAll(".topnav-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
+  $("screen-list").classList.toggle("hidden", tab !== "list");
+  $("screen-outbox").classList.toggle("hidden", tab !== "outbox");
+  $("screen-memo").classList.add("hidden");
+  if (tab === "outbox") renderOutbox();
+  if (tab === "list") renderList();
+}
+
+// ============ EVENT WIRING ============
+document.querySelectorAll(".topnav-btn").forEach(btn => {
+  btn.onclick = () => showTab(btn.dataset.tab);
+});
+
+$("btn-start").onclick = () => {
+  const next = CONTACTS.find(c => !state.completed.includes(c.id));
+  if (next) openBriefing(next);
+};
+
+$("btn-load").onclick = () => $("file-picker").click();
+
+$("file-picker").onchange = (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      let newContacts = [];
+      let meta = { date: "", source: file.name };
+
+      // Accept two formats:
+      // 1) bare array of contacts: [{name, phone, ...}, ...]
+      // 2) wrapped object: {date: "...", contacts: [...]}
+      if (Array.isArray(data)) {
+        newContacts = data;
+      } else if (data && Array.isArray(data.contacts)) {
+        newContacts = data.contacts;
+        if (data.date) meta.date = data.date;
+        if (data.source) meta.source = data.source;
+      } else {
+        throw new Error("Onbekend formaat. Verwacht een lijst van contacten of een object met contacts: [...].");
+      }
+
+      // Validate and normalize each contact
+      const normalized = newContacts.map((c, i) => ({
+        id: c.id || (i + 1),
+        name: c.name || "Onbekend",
+        role: c.role || "",
+        phone: c.phone || "",
+        initials: c.initials || (c.name || "?").split(" ").map(w => w[0]).slice(0, 2).join(""),
+        avatar: c.avatar || ["c1","c2","c3","c4","c5","c6"][i % 6],
+        tag: c.tag || "warm",
+        tagLabel: c.tagLabel || "Warm",
+        briefing: c.briefing || "Bellen met " + (c.name || "contact") + "."
+      }));
+
+      CONTACTS = normalized;
+      LIST_META = meta;
+      state.contacts = normalized;
+      state.listDate = meta.date;
+      state.listSource = meta.source;
+      // Reset the day progress when a fresh list is loaded
+      state.completed = [];
+      saveState();
+      renderList();
+      showToast("Lijst geladen: " + normalized.length + " contacten");
+    } catch (err) {
+      alert("Kon het bestand niet lezen.\n\n" + err.message);
+    }
+    // Reset the picker so the same file can be re-selected later
+    e.target.value = "";
+  };
+  reader.readAsText(file);
+};
+
+$("b-call").onclick = () => {
+  if (currentContact) placeCall(currentContact);
+};
+
+$("b-skip").onclick = () => {
+  closeBriefing();
+  if (currentContact && !state.completed.includes(currentContact.id)) {
+    state.completed.push(currentContact.id);
+    saveState();
+    renderList();
+  }
+};
+
+$("mic-btn").onclick = () => {
+  if ($("mic-btn").classList.contains("idle")) {
+    startMemo();
+  } else {
+    stopMemo();
+  }
+};
+
+$("m-save").onclick = saveMemo;
+$("m-back").onclick = backToList;
+$("btn-share").onclick = shareMemos;
+$("btn-copy").onclick = copyMemos;
+$("btn-clear").onclick = clearMemos;
+
+// Initial render
+renderList();
+
+// Preload voices (some browsers need this)
+if (window.speechSynthesis) {
+  window.speechSynthesis.getVoices();
+  window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+}
+</script>
+</body>
+</html>
