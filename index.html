@@ -288,7 +288,7 @@ function renderList() {
   const nextContact = pending[0];
 
   const dateStr = new Date().toLocaleDateString("nl-NL", { weekday: "long", day: "numeric", month: "long" });
-  $("eyebrow").textContent = dateStr + " · v4";
+  $("eyebrow").textContent = dateStr + " · v5";
 
   const listEl = $("list");
 
@@ -514,18 +514,22 @@ function startMemo() {
   recognition.continuous = true;
   recognition.interimResults = true;
 
-  let finalText = "";
+  let sessionFinalText = "";
   recognition.onresult = (e) => {
     let interim = "";
+    let newFinal = "";
     for (let i = e.resultIndex; i < e.results.length; i++) {
       if (e.results[i].isFinal) {
-        finalText += e.results[i][0].transcript + " ";
+        newFinal += e.results[i][0].transcript + " ";
       } else {
         interim += e.results[i][0].transcript;
       }
     }
-    liveTranscript = finalText;
-    const display = finalText + (interim ? " " + interim : "");
+    if (newFinal) {
+      sessionFinalText += newFinal;
+      liveTranscript = sessionFinalText;
+    }
+    const display = sessionFinalText + (interim ? " " + interim : "");
     if (display.trim()) {
       $("transcript").textContent = display;
       $("transcript").classList.remove("empty");
@@ -535,13 +539,14 @@ function startMemo() {
   recognition.onerror = (e) => {
     console.log("Recognition error:", e.error);
     if (e.error === "no-speech") {
-      // Restart silently
       try { recognition.start(); } catch {}
     }
   };
 
   recognition.onend = () => {
-    // Restart if still recording (continuous mode sometimes drops)
+    // Save accumulated text before potential restart
+    liveTranscript = sessionFinalText;
+    // Restart if still recording
     if ($("mic-btn") && !$("mic-btn").classList.contains("idle")) {
       try { recognition.start(); } catch {}
     }
