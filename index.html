@@ -219,7 +219,7 @@
         <p class="memo-hint" id="m-hint">Tik op de microfoon</p>
       </div>
 
-      <div class="transcript-box empty" id="transcript">Spraak verschijnt hier…</div>
+      <div class="transcript-box empty hidden" id="transcript">Spraak verschijnt hier…</div>
 
       <div class="memo-actions">
         <button class="btn-primary" id="m-save">Opslaan en volgende</button>
@@ -288,7 +288,7 @@ function renderList() {
   const nextContact = pending[0];
 
   const dateStr = new Date().toLocaleDateString("nl-NL", { weekday: "long", day: "numeric", month: "long" });
-  $("eyebrow").textContent = dateStr + " · v3";
+  $("eyebrow").textContent = dateStr + " · v4";
 
   const listEl = $("list");
 
