@@ -89,8 +89,9 @@
   .quick-text { flex: 1; }
   .memo-divider { text-align: center; font-size: 12px; color: #555; margin: 4px 0 8px; text-transform: uppercase; letter-spacing: 0.5px; }
   .memo-mic-wrap { display: flex; flex-direction: column; align-items: center; padding: 8px 0; }
-  .mic-btn { width: 80px; height: 80px; border-radius: 50%; background: #3a1414; border: 3px solid #e24b4a; color: #f09595; font-size: 32px; display: flex; align-items: center; justify-content: center; animation: micpulse 1.6s ease-in-out infinite; }
-  .mic-btn.idle { background: #1a1a1a; border-color: #2a2a2a; color: #888; animation: none; }
+  .mic-btn { width: 80px; height: 80px; border-radius: 50%; background: #1d9e75; border: 3px solid #2dd197; color: #fff; font-size: 32px; display: flex; align-items: center; justify-content: center; animation: micpulse 1.6s ease-in-out infinite; }
+  .mic-btn.idle { background: #1d9e75; border-color: #2dd197; color: #fff; animation: none; }
+  .mic-btn.recording { background: #e24b4a; border-color: #ff6b6b; color: #fff; }
   .timer { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; margin: 12px 0 4px; color: #fff; }
   .memo-hint { font-size: 13px; color: #888; margin: 0; }
   .transcript-box { background: #161616; border: 0.5px solid #2a2a2a; border-radius: 12px; padding: 12px 14px; font-size: 14px; line-height: 1.5; color: #e5e5e5; margin: 12px 0 14px; min-height: 60px; max-height: 160px; overflow-y: auto; }
@@ -288,7 +289,7 @@ function renderList() {
   const nextContact = pending[0];
 
   const dateStr = new Date().toLocaleDateString("nl-NL", { weekday: "long", day: "numeric", month: "long" });
-  $("eyebrow").textContent = dateStr + " · v6";
+  $("eyebrow").textContent = dateStr + " · v7";
 
   const listEl = $("list");
 
@@ -402,6 +403,18 @@ function closeBriefing() {
 }
 
 // ============ NOTIFICATIONS ============
+let swRegistration = null;
+
+async function registerServiceWorker() {
+  if (!("serviceWorker" in navigator)) return;
+  try {
+    swRegistration = await navigator.serviceWorker.register("./sw.js", { scope: "./" });
+    await navigator.serviceWorker.ready;
+  } catch (e) {
+    console.log("SW registration failed:", e);
+  }
+}
+
 async function ensureNotificationPermission() {
   if (!("Notification" in window)) return false;
   if (Notification.permission === "granted") return true;
@@ -412,22 +425,27 @@ async function ensureNotificationPermission() {
 
 function showCallNotification(contact) {
   if (!("Notification" in window) || Notification.permission !== "granted") return;
-  // Clear any existing call notification first
-  if (window._callNotification) {
-    try { window._callNotification.close(); } catch {}
+  const title = "Memo voor " + contact.name;
+  const options = {
+    body: "Tik om terug te keren naar Cockpit",
+    icon: "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="22" fill="%231d9e75"/><path d="M30 35 Q30 30 35 30 L42 30 L48 42 L42 48 Q48 58 60 64 L66 58 L78 64 L78 71 Q78 76 73 76 Q48 76 30 58 Q30 45 30 35 Z" fill="white"/></svg>'),
+    tag: "cockpit-call",
+    requireInteraction: true,
+    silent: false
+  };
+  // Prefer service worker for reliable notifications when app is in background
+  if (swRegistration) {
+    try {
+      swRegistration.showNotification(title, options);
+      return;
+    } catch (e) {
+      console.log("SW notification failed:", e);
+    }
   }
+  // Fallback to direct Notification API
   try {
-    const notif = new Notification("Memo voor " + contact.name, {
-      body: "Tik om terug te keren naar Cockpit",
-      icon: "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="22" fill="%231d9e75"/><path d="M30 35 Q30 30 35 30 L42 30 L48 42 L42 48 Q48 58 60 64 L66 58 L78 64 L78 71 Q78 76 73 76 Q48 76 30 58 Q30 45 30 35 Z" fill="white"/></svg>'),
-      tag: "cockpit-call",
-      requireInteraction: true,
-      silent: false
-    });
-    notif.onclick = () => {
-      window.focus();
-      notif.close();
-    };
+    const notif = new Notification(title, options);
+    notif.onclick = () => { window.focus(); notif.close(); };
     window._callNotification = notif;
   } catch (e) {
     console.log("Notification failed:", e);
@@ -435,6 +453,13 @@ function showCallNotification(contact) {
 }
 
 function clearCallNotification() {
+  // Clear via service worker
+  if (swRegistration) {
+    swRegistration.getNotifications({ tag: "cockpit-call" }).then((notifs) => {
+      notifs.forEach((n) => n.close());
+    }).catch(() => {});
+  }
+  // Also clear direct notification if any
   if (window._callNotification) {
     try { window._callNotification.close(); } catch {}
     window._callNotification = null;
@@ -493,8 +518,10 @@ function showMemoScreen(contact) {
   $("transcript").textContent = "Spraak verschijnt hier…";
   $("transcript").classList.add("empty");
   $("m-timer").textContent = "0:00";
-  $("m-hint").textContent = "Tik op de microfoon";
+  $("m-hint").textContent = "Tik op de microfoon om memo op te nemen";
   $("mic-btn").classList.add("idle");
+  $("mic-btn").classList.remove("recording");
+  $("mic-btn").textContent = "●";
   liveTranscript = "";
   // Clear the pending memo flag since we're now on the memo screen
   localStorage.removeItem("cockpit_pending_memo");
@@ -535,7 +562,9 @@ function recordQuickOutcome(outcomeType) {
 
 function startMemo() {
   $("mic-btn").classList.remove("idle");
-  $("m-hint").textContent = "Aan het luisteren…";
+  $("mic-btn").classList.add("recording");
+  $("mic-btn").textContent = "■";
+  $("m-hint").textContent = "Aan het luisteren… tik om te stoppen";
   memoStartTime = Date.now();
 
   if (memoTimer) clearInterval(memoTimer);
@@ -614,7 +643,9 @@ function stopMemo() {
     memoTimer = null;
   }
   $("mic-btn").classList.add("idle");
-  $("m-hint").textContent = "Opgenomen. Tik om door te gaan.";
+  $("mic-btn").classList.remove("recording");
+  $("mic-btn").textContent = "●";
+  $("m-hint").textContent = "Opgenomen. Tik Opslaan om door te gaan.";
 }
 
 function saveMemo() {
@@ -906,6 +937,8 @@ document.addEventListener("visibilitychange", () => {
 renderList();
 // Check on initial load too — in case user navigated away and back via home screen
 checkPendingMemo();
+// Register service worker for reliable notifications
+registerServiceWorker();
 
 // Preload voices (some browsers need this)
 if (window.speechSynthesis) {
